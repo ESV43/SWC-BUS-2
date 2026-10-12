@@ -197,34 +197,7 @@
   }
   $("logoutBtn").onclick=()=>{ user=null; try{localStorage.removeItem("swc_user");}catch(e){} try{google.accounts.id.disableAutoSelect();}catch(e){} paintUser(); };
 
-  /* book with Razorpay — 2 steps:
-     1) createOrder (backend validates + creates Razorpay order for Rs 100)
-     2) open Razorpay Checkout → on success, verifyPayment (backend verifies
-        signature + captures, THEN allots CONFIRMED / WAITLIST seat) */
-  const FARE = Number((CFG.FARE_TOTAL||100));
-  const CANCEL_REFUND = Number((CFG.CANCEL_REFUND||90));
-  function openRazorpay(order, svc, name, email, phone, msg){
-    return new Promise((resolve,reject)=>{
-      if(typeof window.Razorpay==="undefined"){ reject(new Error("Razorpay failed to load. Check connection / ad-blocker and retry.")); return; }
-      const keyId = order.keyId || CFG.RAZORPAY_KEY_ID;
-      if(!keyId || keyId.indexOf("REPLACE")>=0){ reject(new Error("Razorpay key not configured in config.js.")); return; }
-      const tag=(svc.serviceName||svc.day||"")+" "+(svc.serviceDate||"");
-      const rzp=new window.Razorpay({
-        key:keyId, amount:order.amount, currency:order.currency||"INR",
-        name:"SWC · IISER TVM", description:("Bus seat · "+tag).slice(0,120),
-        order_id:order.orderId,
-        prefill:{name,email,contact:phone},
-        theme:{color:"#191712"},
-        modal:{ondismiss:()=>reject(new Error("Payment window closed. No money deducted — try again to book."))},
-        handler:(resp)=>resolve(resp)
-      });
-      rzp.on("payment.failed",(r)=>{
-        const d=(r&&r.error&&r.error.description)||"Payment failed.";
-        reject(new Error(d+" If money was deducted it auto-refunds in 5–7 days — contact SWC with payment ID."));
-      });
-      rzp.open();
-    });
-  }
+  /* book — email comes ONLY from Google login, never from the input */
   $("bookForm").addEventListener("submit",async(e)=>{
     e.preventDefault();
     const msg=$("formMsg"); msg.className="form-msg"; msg.textContent="";
@@ -239,34 +212,24 @@
     const email=user.email.toLowerCase(); // authoritative source — ignore anything in #fEmail
     $("fEmail").value=email; // re-sync in case DevTools tampered with it
     if(!email.endsWith(DOMAIN)){ msg.className="form-msg err"; msg.textContent="Only "+DOMAIN+" IDs can book. You are signed in as "+email+"."; return; }
-    const btn=$("bookBtn"); btn.disabled=true; btn.textContent="CREATING ORDER…";
+    $("bookBtn").disabled=true; $("bookBtn").textContent="BOOKING…";
     try{
-      // Step 1: eligibility + Razorpay order (Rs 100)
-      const ord=await apiPost({action:"createOrder",serviceId,serviceDate:svc.serviceDate,name,email,phone,idToken:user.idToken});
-      if(!ord.ok) throw new Error(ord.error);
-      btn.textContent="OPENING PAYMENT…";
-      // Step 2: Razorpay Checkout
-      const payResp=await openRazorpay(ord,svc,name,email,phone,msg);
-      btn.textContent="VERIFYING PAYMENT…";
-      // Step 3: verify signature + allot seat
-      const j=await apiPost({action:"verifyPayment",serviceId,serviceDate:svc.serviceDate,name,email,phone,idToken:user.idToken,
-        razorpay_order_id:payResp.razorpay_order_id,razorpay_payment_id:payResp.razorpay_payment_id,razorpay_signature:payResp.razorpay_signature});
-      if(!j.ok) throw new Error(j.error+" (Payment "+payResp.razorpay_payment_id+" — contact SWC if deducted.)");
+      const j=await apiPost({action:"book",serviceId,serviceDate:svc.serviceDate,name,email,phone,idToken:user.idToken});
+      if(!j.ok) throw new Error(j.error);
       const tag=svc.serviceName?esc(svc.serviceName)+" · ":"";
-      const paidLine=`<br>Paid: <b>₹${FARE}</b> · Payment <b>${esc(j.paymentId||payResp.razorpay_payment_id)}</b>`;
       if(j.status==="CONFIRMED"){
-        msg.className="form-msg ok"; msg.textContent="Payment verified! Booked — mail sent to "+email;
-        showModal("Seat booked ✅",`Hi <b>${esc(name)}</b> — ${tag}<b>${esc(svc.serviceDate||"")}</b> confirmed.<br><br>ID: <b>${esc(j.bookingId)}</b>${paidLine}<br>Mail from <b>SWC.IISER.TVM</b> sent to <b>${esc(email)}</b>.<br>Be ready 15 min early with college ID.<br><br><span style="font-size:12px">Cancel anytime: ₹${CANCEL_REFUND} auto-refund (₹10 platform fee kept).</span>`);
+        msg.className="form-msg ok"; msg.textContent="Booked! Mail sent to "+email;
+        showModal("Seat booked ✅",`Hi <b>${esc(name)}</b> — ${tag}<b>${esc(svc.serviceDate||"")}</b> confirmed.<br><br>ID: <b>${esc(j.bookingId)}</b><br>Mail from <b>SWC.IISER.TVM</b> sent to <b>${esc(email)}</b>.<br>Be ready 15 min early with college ID.`);
       }else{
-        msg.className="form-msg ok"; msg.textContent=`Payment verified! All ${svc.totalSeats||""} filled — waitlist #${j.waitlistPosition}`;
-        showModal("Waitlist #"+j.waitlistPosition,`Sorry, all seats are filled.<br><br>You are <b>#${esc(j.waitlistPosition)}</b> for ${tag}<b>${esc(svc.serviceDate||"")}</b> (ID <b>${esc(j.bookingId)}</b>).${paidLine}<br>Auto-confirm + mail if someone cancels.<br><b>Never promoted by departure? Full ₹${FARE} auto-refunded.</b>`);
+        msg.className="form-msg ok"; msg.textContent=`All ${svc.totalSeats||""} filled — waitlist #${j.waitlistPosition}`;
+        showModal("Waitlist #"+j.waitlistPosition,`Sorry, all seats are filled.<br><br>You are <b>#${esc(j.waitlistPosition)}</b> for ${tag}<b>${esc(svc.serviceDate||"")}</b> (ID <b>${esc(j.bookingId)}</b>).<br>Auto-confirm + mail if someone cancels.`);
       }
       loadServices(); loadMy();
     }catch(err){
       msg.className="form-msg err"; msg.textContent=err.message; toast(err.message,"err");
       if(/sign-in|token|expired|login/i.test(err.message||"")) paintUser();
     }
-    finally{ btn.disabled=false; btn.textContent=`PAY ₹${FARE} & BOOK →`; }
+    finally{ $("bookBtn").disabled=false; $("bookBtn").textContent="BOOK SEAT →"; }
   });
 
   /* my bookings — no manual email entry; loads only the signed-in user's bookings */
@@ -285,24 +248,20 @@
     box.innerHTML=list.map(b=>{
       const nm=b.serviceName||b.day||"";
       const dep=b.departure||b.serviceDate||"";
-      const paid=b.amountPaid?` · ₹${(b.amountPaid/100)} paid`:"";
-      const rf=b.refundAmount?` · ₹${(b.refundAmount/100)} refunded`:"";
-      const payExtra=(b.paymentId||b.refundStatus)?`<br><span class="id">${b.paymentId?"pay "+esc(b.paymentId):""}${rf}${b.refundStatus?" · "+esc(b.refundStatus):""}</span>`:"";
       return `<div class="ticket-row">
-      <div><strong>${esc(nm)} · ${esc(dep)}</strong><br><span class="id">${esc(b.bookingId)}${b.seatNo?" · seat "+esc(b.seatNo):""}${b.waitlistPosition?" · WL #"+esc(b.waitlistPosition):""}${paid}</span>${payExtra}</div>
+      <div><strong>${esc(nm)} · ${esc(dep)}</strong><br><span class="id">${esc(b.bookingId)}${b.seatNo?" · seat "+esc(b.seatNo):""}${b.waitlistPosition?" · WL #"+esc(b.waitlistPosition):""}</span></div>
       <div style="display:flex;gap:8px;align-items:center"><span class="pill ${b.status}">${b.status}</span>
-      ${(b.status==="CONFIRMED"||b.status==="WAITLIST")?`<button class="cancel" onclick="window._cancel('${b.bookingId}')">Cancel (₹${CANCEL_REFUND} refund)</button>`:""}</div>
+      ${(b.status==="CONFIRMED"||b.status==="WAITLIST")?`<button class="cancel" onclick="window._cancel('${b.bookingId}')">Cancel</button>`:""}</div>
     </div>`;}).join("");
   }
   window._cancel=async(id)=>{
     if(!user||!user.email||!user.idToken){ toast("Please sign in first.","err"); return; }
     const email=user.email.toLowerCase();
-    if(!confirm(`Cancel ${id}?\n\nSeat goes to the waitlist.\n₹${CANCEL_REFUND} auto-refunded to source in 5–7 days (₹10 platform fee kept).`)) return;
+    if(!confirm("Cancel "+id+"? Seat goes to the waitlist.")) return;
     try{
-      toast("Cancelling + processing ₹"+CANCEL_REFUND+" refund…","");
       const j=await apiPost({action:"cancel",bookingId:id,email,idToken:user.idToken});
       if(!j.ok) throw new Error(j.error);
-      toast(j.message,"ok"); showModal("Cancelled + refund",esc(j.message)+"<br><br>Mail sent by <b>SWC.IISER.TVM</b>.");
+      toast(j.message,"ok"); showModal("Cancelled",esc(j.message)+"<br><br>Mail sent by <b>SWC.IISER.TVM</b>.");
     }catch(e){ toast(e.message,"err"); }
     loadServices(); loadMy();
   };
