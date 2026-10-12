@@ -7,6 +7,10 @@
 window.SWC_CONFIG = {
   APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbxQNqkYf_IH1tETGFSDZNSOR816qA5XnLS_ro70FE1ha0Y8Ds9A-B-vl7645mjOkr63/exec", // e.g. "https://script.google.com/macros/s/AKfyc.../exec"
   GOOGLE_CLIENT_ID: "71909220285-647djv3jpier18p19htkd5ia6obp192n.apps.googleusercontent.com", // e.g. "123456789-abc.apps.googleusercontent.com"
+  RAZORPAY_KEY_ID: "rzp_test_REPLACE_WITH_YOUR_KEY_ID", // public key only — secret stays in Apps Script Script Properties
+  FARE_TOTAL: 100,     // Rs charged at booking (confirmed OR waitlist)
+  CANCEL_REFUND: 90,   // Rs refunded on user cancel (Rs 10 platform fee kept)
+  CURRENCY: "INR",
   TOTAL_SEATS: 32,
   ALLOWED_DOMAIN: "@iisertvm.ac.in",
   ROUTE_FROM: "Thampanoor Bus Stand",
