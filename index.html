@@ -11,7 +11,6 @@
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css" />
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 </head>
 <body>
 
@@ -49,12 +48,8 @@
 
   <!-- booking -->
   <section>
-    <h2 class="sec-t">Book a seat · ₹100</h2>
+    <h2 class="sec-t">Book a seat</h2>
     <p class="hint">Only <strong>@iisertvm.ac.in</strong> IDs via Google sign-in. One booking per email per bus. No seat choice — first-come, first-served.</p>
-    <div class="fare-box" style="border:2px solid #191712;border-radius:10px;padding:10px 12px;margin:10px 0;font-size:13px;line-height:1.7;background:#fffdf6">
-      <div><strong>💳 Fare: ₹100</strong> via Razorpay (UPI / card / netbanking). Pay to confirm — seat or waitlist is allotted only after payment verification.</div>
-      <div style="margin-top:6px;color:#4a463d">↩️ <strong>Cancel anytime:</strong> ₹90 auto-refund to source in 5–7 days (₹10 platform fee kept).<br>⏳ <strong>Waitlist never promoted by departure?</strong> Full ₹100 auto-refunded.</div>
-    </div>
     <div id="gBtnWrap"></div>
     <p id="authGate" class="auth-gate">🔒 Please sign in with Google above to book. Your IISER email is filled automatically — typing is disabled.</p>
     <form id="bookForm" autocomplete="on">
@@ -72,7 +67,7 @@
       </label>
       <p class="hint lock-note">🔒 Email cannot be typed — it is taken only from your verified Google sign-in and must end with <strong>@iisertvm.ac.in</strong>.</p>
       <div id="formMsg" class="form-msg"></div>
-      <button class="book-btn" type="submit" id="bookBtn">PAY ₹100 &amp; BOOK →</button>
+      <button class="book-btn" type="submit" id="bookBtn">BOOK SEAT →</button>
       <p class="hint">Full bus? You'll be offered the waitlist — if someone cancels, #1 is auto-confirmed &amp; emailed by <strong>SWC.IISER.TVM</strong>.</p>
     </form>
   </section>
