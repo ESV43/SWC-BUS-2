@@ -6,10 +6,10 @@
 
 window.SWC_CONFIG = {
   APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbw6lPIUIrTuLz1KOr9Ywc5D_bBzLOhwJhsMngKi3I5GYj43XfsERvmEkJz70ikTGXeS/exec", // e.g. "https://script.google.com/macros/s/AKfyc.../exec"
-  GOOGLE_CLIENT_ID: "71909220285-647djv3jpier18p19htkd5ia6obp192n.apps.googleusercontent.com", // e.g. "123456789-abc.apps.googleusercontent.com"
-  RAZORPAY_KEY_ID: "rzp_test_REPLACE_WITH_YOUR_KEY_ID", // public key only — secret stays in Apps Script Script Properties
-  FARE_TOTAL: 100,     // Rs charged at booking (confirmed OR waitlist)
-  CANCEL_REFUND: 90,   // Rs refunded on user cancel (Rs 10 platform fee kept)
+  GOOGLE_CLIENT_ID: "71909220285-647djv3jpier18p19htkd5ia6obp192n.apps.googleusercontent.com",
+  RAZORPAY_KEY_ID: "__RAZORPAY_KEY_ID__", // public key only — RAZORPAY_KEY_SECRET never goes in frontend
+  FARE_TOTAL: 100,
+  CANCEL_REFUND: 90,
   CURRENCY: "INR",
   TOTAL_SEATS: 32,
   ALLOWED_DOMAIN: "@iisertvm.ac.in",
