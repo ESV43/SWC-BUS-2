@@ -103,8 +103,10 @@
       </div>`;
     }).join("") || `<p class="hint">No upcoming buses right now — check back soon.</p>`;
     $("fService").innerHTML=services.map(s=>`<option value="${esc(s.serviceId)}">${s.kind==="special"?esc(s.serviceName)+" · ":""}${String(s.day||"").slice(0,3)} ${fmtD(s.serviceDate)} — ${s.disabled?"off":s.available<=0?"full · waitlist":s.available+" left"}</option>`).join("");
-    tick();
-  }
+     tick();
+     const _s0 = services.find(x=>x.serviceId===$("fService").value) || services[0];
+     if(_s0){ const _f = _s0.farePaise ? (_s0.farePaise/100) : FARE; $("bookBtn").textContent = `PAY ₹${_f} & BOOK →`; }
+   }
   window._prefill=(sid)=>{ $("fService").value=sid; $("bookForm").scrollIntoView({behavior:"smooth",block:"center"}); };
 
   function shortDay(s){ return s.kind==="special"?s.serviceName:String(s.day||"").slice(0,3); }
@@ -202,7 +204,7 @@
      2) open Razorpay Checkout → on success, verifyPayment (backend verifies
         signature + captures, THEN allots CONFIRMED / WAITLIST seat) */
   const FARE = Number((CFG.FARE_TOTAL||100));
-  const CANCEL_REFUND = Number((CFG.CANCEL_REFUND||90));
+  const CANCEL_REFUND = Number((CFG.CANCEL_REFUND||70));
   function openRazorpay(order, svc, name, email, phone, msg){
     return new Promise((resolve,reject)=>{
       if(typeof window.Razorpay==="undefined"){ reject(new Error("Razorpay failed to load. Check connection / ad-blocker and retry.")); return; }
@@ -235,6 +237,7 @@
     }
     const serviceId=$("fService").value;
     const svc=services.find(x=>x.serviceId===serviceId) || {};
+    const fare = (svc && svc.farePaise) ? (svc.farePaise/100) : FARE;
     const name=$("fName").value.trim(), phone=$("fPhone").value.trim();
     const email=user.email.toLowerCase(); // authoritative source — ignore anything in #fEmail
     $("fEmail").value=email; // re-sync in case DevTools tampered with it
@@ -253,20 +256,20 @@
         razorpay_order_id:payResp.razorpay_order_id,razorpay_payment_id:payResp.razorpay_payment_id,razorpay_signature:payResp.razorpay_signature});
       if(!j.ok) throw new Error(j.error+" (Payment "+payResp.razorpay_payment_id+" — contact SWC if deducted.)");
       const tag=svc.serviceName?esc(svc.serviceName)+" · ":"";
-      const paidLine=`<br>Paid: <b>₹${FARE}</b> · Payment <b>${esc(j.paymentId||payResp.razorpay_payment_id)}</b>`;
+      const paidLine=`<br>Paid: <b>₹${fare}</b> · Payment <b>${esc(j.paymentId||payResp.razorpay_payment_id)}</b>`;
       if(j.status==="CONFIRMED"){
         msg.className="form-msg ok"; msg.textContent="Payment verified! Booked — mail sent to "+email;
-        showModal("Seat booked ✅",`Hi <b>${esc(name)}</b> — ${tag}<b>${esc(svc.serviceDate||"")}</b> confirmed.<br><br>ID: <b>${esc(j.bookingId)}</b>${paidLine}<br>Mail from <b>SWC.IISER.TVM</b> sent to <b>${esc(email)}</b>.<br>Be ready 15 min early with college ID.<br><br><span style="font-size:12px">Cancel anytime: ₹${CANCEL_REFUND} auto-refund (₹10 platform fee kept).</span>`);
+        showModal("Seat booked ✅",`Hi <b>${esc(name)}</b> — ${tag}<b>${esc(svc.serviceDate||"")}</b> confirmed.<br><br>ID: <b>${esc(j.bookingId)}</b>${paidLine}<br>Mail from <b>SWC.IISER.TVM</b> sent to <b>${esc(email)}</b>.<br>Be ready 15 min early with college ID.<br><br><span style="font-size:12px">Cancel anytime: ₹${CANCEL_REFUND} auto-refund (₹30 convenience fee kept).</span>`);
       }else{
         msg.className="form-msg ok"; msg.textContent=`Payment verified! All ${svc.totalSeats||""} filled — waitlist #${j.waitlistPosition}`;
-        showModal("Waitlist #"+j.waitlistPosition,`Sorry, all seats are filled.<br><br>You are <b>#${esc(j.waitlistPosition)}</b> for ${tag}<b>${esc(svc.serviceDate||"")}</b> (ID <b>${esc(j.bookingId)}</b>).${paidLine}<br>Auto-confirm + mail if someone cancels.<br><b>Never promoted by departure? Full ₹${FARE} auto-refunded.</b>`);
+        showModal("Waitlist #"+j.waitlistPosition,`Sorry, all seats are filled.<br><br>You are <b>#${esc(j.waitlistPosition)}</b> for ${tag}<b>${esc(svc.serviceDate||"")}</b> (ID <b>${esc(j.bookingId)}</b>).${paidLine}<br>Auto-confirm + mail if someone cancels.<br><b>Never promoted by departure? Full ₹${fare} auto-refunded.</b>`);
       }
       loadServices(); loadMy();
     }catch(err){
       msg.className="form-msg err"; msg.textContent=err.message; toast(err.message,"err");
       if(/sign-in|token|expired|login/i.test(err.message||"")) paintUser();
     }
-    finally{ btn.disabled=false; btn.textContent=`PAY ₹${FARE} & BOOK →`; }
+    finally{ btn.disabled=false; btn.textContent=`PAY ₹${fare} & BOOK →`; }
   });
 
   /* my bookings — no manual email entry; loads only the signed-in user's bookings */
@@ -297,7 +300,7 @@
   window._cancel=async(id)=>{
     if(!user||!user.email||!user.idToken){ toast("Please sign in first.","err"); return; }
     const email=user.email.toLowerCase();
-    if(!confirm(`Cancel ${id}?\n\nSeat goes to the waitlist.\n₹${CANCEL_REFUND} auto-refunded to source in 5–7 days (₹10 platform fee kept).`)) return;
+    if(!confirm(`Cancel ${id}?\n\nSeat goes to the waitlist.\n₹${CANCEL_REFUND} auto-refunded to source in 5–7 days (₹30 convenience fee kept).`)) return;
     try{
       toast("Cancelling + processing ₹"+CANCEL_REFUND+" refund…","");
       const j=await apiPost({action:"cancel",bookingId:id,email,idToken:user.idToken});
@@ -306,6 +309,12 @@
     }catch(e){ toast(e.message,"err"); }
     loadServices(); loadMy();
   };
+
+  $("fService").addEventListener("change",()=>{
+    const s=services.find(x=>x.serviceId===$("fService").value);
+    const f=s&&s.farePaise?(s.farePaise/100):FARE;
+    $("bookBtn").textContent=`PAY ₹${f} & BOOK →`;
+  });
 
   initAuth(); loadServices();
   if(user&&user.email) loadMy();
