@@ -5,7 +5,7 @@
 //    Authorised JavaScript origin: https://YOUR-USERNAME.github.io (+ http://localhost:8000 for testing)
 
 window.SWC_CONFIG = {
-  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbxTev7I866xvP47IaaU6qItcxeNNQzm1P2ipANH86SZX63NGsAv7dBHCKFi7zSmBthT/exec", // e.g. "https://script.google.com/macros/s/AKfyc.../exec"
+  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbw6lPIUIrTuLz1KOr9Ywc5D_bBzLOhwJhsMngKi3I5GYj43XfsERvmEkJz70ikTGXeS/exec", // e.g. "https://script.google.com/macros/s/AKfyc.../exec"
   GOOGLE_CLIENT_ID: "71909220285-647djv3jpier18p19htkd5ia6obp192n.apps.googleusercontent.com", // e.g. "123456789-abc.apps.googleusercontent.com"
   RAZORPAY_KEY_ID: "rzp_test_REPLACE_WITH_YOUR_KEY_ID", // public key only — secret stays in Apps Script Script Properties
   FARE_TOTAL: 100,     // Rs charged at booking (confirmed OR waitlist)
