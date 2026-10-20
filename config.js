@@ -5,7 +5,7 @@
 //    Authorised JavaScript origin: https://YOUR-USERNAME.github.io (+ http://localhost:8000 for testing)
 
 window.SWC_CONFIG = {
-  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbzv2ccUXWWByQgqg9PtMXdkaBhog_cKpQ2YufayEHu6SZB_mwbGKiELKwPmqrz2ArKn/exec", // e.g. "https://script.google.com/macros/s/AKfyc.../exec"
+  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbxBDvVD6BiM5aPd7EVl-6Ohms-Sk9O0aQBTejYJYB7RUKQVNZiZGWYVw9hq1xi75Dry/exec", // e.g. "https://script.google.com/macros/s/AKfyc.../exec"
   GOOGLE_CLIENT_ID: "71909220285-647djv3jpier18p19htkd5ia6obp192n.apps.googleusercontent.com",
   RAZORPAY_KEY_ID: "__RAZORPAY_KEY_ID__", // public key only — RAZORPAY_KEY_SECRET never goes in frontend
   FARE_TOTAL: 100,
