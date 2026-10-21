@@ -6,6 +6,7 @@
   const $ = (id) => document.getElementById(id);
   const cardsEl = $("serviceCards"), countdownEl = $("countdown"), modeBadge = $("modeBadge");
   let services = [];
+  let myBookingsCache = [];
   let timer = null;
   let user = null;
   try { user = JSON.parse(localStorage.getItem("swc_user") || "null"); } catch(e){ user=null; }
@@ -106,8 +107,17 @@
      tick();
      const _s0 = services.find(x=>x.serviceId===$("fService").value) || services[0];
      if(_s0){ const _f = _s0.farePaise ? (_s0.farePaise/100) : FARE; $("bookBtn").textContent = `PAY ₹${_f} & BOOK →`; }
+     syncFareBox(_s0);
    }
-  window._prefill=(sid)=>{ $("fService").value=sid; $("bookForm").scrollIntoView({behavior:"smooth",block:"center"}); };
+  window._prefill=(sid)=>{ $("fService").value=sid; const s=services.find(x=>x.serviceId===sid); syncFareBox(s); const f=s&&s.farePaise?(s.farePaise/100):FARE; $("bookBtn").textContent=`PAY ₹${f} & BOOK →`; $("bookForm").scrollIntoView({behavior:"smooth",block:"center"}); };
+  function syncFareBox(s){
+    const f = s && s.farePaise ? (s.farePaise/100) : FARE;
+    const r = s && s.cancelRefundPaise != null ? (s.cancelRefundPaise/100) : CANCEL_REFUND;
+    const a=$("fareAmt"), b=$("refundAmt"), c=$("waitRefundAmt");
+    if(a) a.textContent=`₹${f}`;
+    if(b) b.textContent=`₹${r}`;
+    if(c) c.textContent=`₹${f}`;
+  }
 
   function shortDay(s){ return s.kind==="special"?s.serviceName:String(s.day||"").slice(0,3); }
   function tick(){
@@ -238,6 +248,7 @@
     const serviceId=$("fService").value;
     const svc=services.find(x=>x.serviceId===serviceId) || {};
     const fare = (svc && svc.farePaise) ? (svc.farePaise/100) : FARE;
+    const refund = (svc && svc.cancelRefundPaise != null) ? (svc.cancelRefundPaise/100) : CANCEL_REFUND;
     const name=$("fName").value.trim(), phone=$("fPhone").value.trim();
     const email=user.email.toLowerCase(); // authoritative source — ignore anything in #fEmail
     $("fEmail").value=email; // re-sync in case DevTools tampered with it
@@ -259,7 +270,7 @@
       const paidLine=`<br>Paid: <b>₹${fare}</b> · Payment <b>${esc(j.paymentId||payResp.razorpay_payment_id)}</b>`;
       if(j.status==="CONFIRMED"){
         msg.className="form-msg ok"; msg.textContent="Payment verified! Booked — mail sent to "+email;
-        showModal("Seat booked ✅",`Hi <b>${esc(name)}</b> — ${tag}<b>${esc(svc.serviceDate||"")}</b> confirmed.<br><br>ID: <b>${esc(j.bookingId)}</b>${paidLine}<br>Mail from <b>SWC.IISER.TVM</b> sent to <b>${esc(email)}</b>.<br>Be ready 15 min early with college ID.<br><br><span style="font-size:12px">Cancel anytime: ₹${CANCEL_REFUND} auto-refund (₹30 convenience fee kept).</span>`);
+        showModal("Seat booked ✅",`Hi <b>${esc(name)}</b> — ${tag}<b>${esc(svc.serviceDate||"")}</b> confirmed.<br><br>ID: <b>${esc(j.bookingId)}</b>${paidLine}<br>Mail from <b>SWC.IISER.TVM</b> sent to <b>${esc(email)}</b>.<br>Be ready 15 min early with college ID.<br><br><span style="font-size:12px">Cancel anytime: ₹${refund} auto-refund (service policy).</span>`);
       }else{
         msg.className="form-msg ok"; msg.textContent=`Payment verified! All ${svc.totalSeats||""} filled — waitlist #${j.waitlistPosition}`;
         showModal("Waitlist #"+j.waitlistPosition,`Sorry, all seats are filled.<br><br>You are <b>#${esc(j.waitlistPosition)}</b> for ${tag}<b>${esc(svc.serviceDate||"")}</b> (ID <b>${esc(j.bookingId)}</b>).${paidLine}<br>Auto-confirm + mail if someone cancels.<br><b>Never promoted by departure? Full ₹${fare} auto-refunded.</b>`);
@@ -279,11 +290,12 @@
     const email=user.email.toLowerCase();
     box.innerHTML=`<p class="hint">Loading…</p>`;
     let list=[];
-    try{
-      const j=await apiPost({action:"mybookings",email,idToken:user.idToken});
-      if(!j.ok) throw new Error(j.error);
-      list=j.bookings;
-    }catch(e){ box.innerHTML=`<p class="hint">⚠️ ${esc(e.message)}</p>`; return; }
+     try{
+       const j=await apiPost({action:"mybookings",email,idToken:user.idToken});
+       if(!j.ok) throw new Error(j.error);
+       list=j.bookings;
+       myBookingsCache=list||[];
+     }catch(e){ box.innerHTML=`<p class="hint">⚠️ ${esc(e.message)}</p>`; return; }
     if(!list.length){ box.innerHTML=`<p class="hint">No bookings for <b>${esc(email)}</b>.</p>`; return; }
     box.innerHTML=list.map(b=>{
       const nm=b.serviceName||b.day||"";
@@ -300,7 +312,9 @@
   window._cancel=async(id)=>{
     if(!user||!user.email||!user.idToken){ toast("Please sign in first.","err"); return; }
     const email=user.email.toLowerCase();
-    if(!confirm(`Cancel ${id}?\n\nSeat goes to the waitlist.\n₹${CANCEL_REFUND} auto-refunded to source in 5–7 days (₹30 convenience fee kept).`)) return;
+    const _b = (myBookingsCache||[]).find(x=>x.bookingId===id);
+   const _r = _b && _b.cancelRefundPaise != null ? (_b.cancelRefundPaise/100) : CANCEL_REFUND;
+   if(!confirm(`Cancel ${id}?\n\nSeat goes to the waitlist.\n₹${_r} auto-refunded to source in 5–7 days (service policy).`)) return;
     try{
       toast("Cancelling + processing ₹"+CANCEL_REFUND+" refund…","");
       const j=await apiPost({action:"cancel",bookingId:id,email,idToken:user.idToken});
@@ -314,6 +328,7 @@
     const s=services.find(x=>x.serviceId===$("fService").value);
     const f=s&&s.farePaise?(s.farePaise/100):FARE;
     $("bookBtn").textContent=`PAY ₹${f} & BOOK →`;
+    syncFareBox(s);
   });
 
   initAuth(); loadServices();

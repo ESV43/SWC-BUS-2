@@ -49,11 +49,11 @@
 
   <!-- booking -->
   <section>
-    <h2 class="sec-t">Book a seat · ₹100</h2>
+    <h2 class="sec-t">Book a seat</h2>
     <p class="hint">Only <strong>@iisertvm.ac.in</strong> IDs via Google sign-in. One booking per email per bus. No seat choice — first-come, first-served.</p>
     <div class="fare-box" style="border:2px solid #191712;border-radius:10px;padding:10px 12px;margin:10px 0;font-size:13px;line-height:1.7;background:#fffdf6">
-      <div><strong>💳 Fare: ₹100</strong> via Razorpay (UPI / card / netbanking). Pay to confirm — seat or waitlist is allotted only after payment verification.</div>
-      <div style="margin-top:6px;color:#4a463d">↩️ <strong>Cancel anytime:</strong> ₹70 auto-refund to source in 5–7 days (₹30 convenience fee kept).<br>⏳ <strong>Waitlist never promoted by departure?</strong> Full ₹100 auto-refunded.</div>
+      <div><strong>💳 Fare: <span id="fareAmt">₹100</span></strong> via Razorpay (UPI / card / netbanking). Pay to confirm — seat or waitlist is allotted only after payment verification.</div>
+      <div style="margin-top:6px;color:#4a463d">↩️ <strong>Cancel anytime:</strong> <span id="refundAmt">₹70</span> auto-refund to source in 5–7 days (service policy).<br>⏳ <strong>Waitlist never promoted by departure?</strong> Full <span id="waitRefundAmt">₹100</span> auto-refunded.</div>
     </div>
     <div id="gBtnWrap"></div>
     <p id="authGate" class="auth-gate">🔒 Please sign in with Google above to book. Your IISER email is filled automatically — typing is disabled.</p>
