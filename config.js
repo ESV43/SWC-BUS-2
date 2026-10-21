@@ -5,7 +5,7 @@
 // Local dev: replace __RAZORPAY_KEY_ID__ with your rzp_test_... key.
 
 window.SWC_CONFIG = {
-  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbxsng5ekP0RIguZltEh7ACmZrfa960gWLBx_SsBYgq3qB5HzmIGpQLwfyzNwiYIYuYY/exec",
+  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbwuHg1Ix1bBv-qQHv7P9_IDZ6LvhMiMBLI2-59AM2ICQKmB9x-WkwmjtBWeoCZsZMW-/exec",
   GOOGLE_CLIENT_ID: "71909220285-647djv3jpier18p19htkd5ia6obp192n.apps.googleusercontent.com",
   RAZORPAY_KEY_ID: "__RAZORPAY_KEY_ID__", // public key only — RAZORPAY_KEY_SECRET never goes in frontend
   FARE_TOTAL: 100,
