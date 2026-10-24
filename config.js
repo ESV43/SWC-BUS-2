@@ -5,7 +5,7 @@
 // Local dev: replace __RAZORPAY_KEY_ID__ with your rzp_test_... key.
 
 window.SWC_CONFIG = {
-  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbwYtx6fV7Y1wnVCWOEr6LTIGh3UJ3zEJ6x2iRqA0fR9wEG2SD8r0L3TRpYbq6b73O2m/exec",
+  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycby3Lr5aSFH3QixFiwzqcNa4TTLsIio65A164PtZTF0Hf0v28hQu3C3QYFE06gXJScoA/exec",
   GOOGLE_CLIENT_ID: "71909220285-647djv3jpier18p19htkd5ia6obp192n.apps.googleusercontent.com",
   RAZORPAY_KEY_ID: "__RAZORPAY_KEY_ID__", // public key only — RAZORPAY_KEY_SECRET never goes in frontend
   // Use rzp_live_... for real payments. rzp_test_... only accepts Razorpay test
