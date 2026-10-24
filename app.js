@@ -21,7 +21,10 @@
 
   const pad = (n)=>String(n).padStart(2,"0");
   const fmtD = (iso)=>{ const p=String(iso).split("-").map(Number); return new Date(p[0],p[1]-1,p[2]).toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"}); };
-  const esc = (s)=>String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  // Escapes HTML text AND attribute/JS-string contexts (quotes included) —
+  // values from the sheet are interpolated into onclick handlers and
+  // attribute values, so unescaped quotes there would allow script injection.
+  const esc = (s)=>String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;").replace(/`/g,"&#96;");
   function toast(msg, type=""){ const t=document.createElement("div"); t.className="toast "+type; t.textContent=msg; $("toasts").appendChild(t); setTimeout(()=>t.remove(),4500); }
   function showModal(title, body){ $("modalTitle").textContent=title; $("modalBody").innerHTML=body; $("modal").classList.remove("hidden"); }
   $("modalClose").onclick=()=>$("modal").classList.add("hidden");
@@ -42,8 +45,8 @@
   modeBadge.classList.add("live");
 
   async function apiGet(params){
-    const u=API+(API.includes("?")?"&":"?")+new URLSearchParams(params).toString();
-    const r=await fetch(u); return r.json();
+    const u=API+(API.includes("?")?"&":"?")+new URLSearchParams(Object.assign({_ts:Date.now()},params)).toString();
+    const r=await fetch(u,{cache:"no-store"}); return r.json();
   }
   async function apiPost(body){
     const r=await fetch(API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(body)});
@@ -111,12 +114,20 @@
    }
   window._prefill=(sid)=>{ $("fService").value=sid; const s=services.find(x=>x.serviceId===sid); syncFareBox(s); const f=s&&s.farePaise?(s.farePaise/100):FARE; $("bookBtn").textContent=`PAY ₹${f} & BOOK →`; $("bookForm").scrollIntoView({behavior:"smooth",block:"center"}); };
   function syncFareBox(s){
-    const f = s && s.farePaise ? (s.farePaise/100) : FARE;
-    const r = s && s.cancelRefundPaise != null ? (s.cancelRefundPaise/100) : CANCEL_REFUND;
     const a=$("fareAmt"), b=$("refundAmt"), c=$("waitRefundAmt");
+    if(!s){
+      if(a) a.textContent="₹—";
+      if(b) b.textContent="Refund policy loads with the bus.";
+      if(c) c.textContent="Full fare auto-refunded.";
+      return;
+    }
+    const f = s.farePaise ? (s.farePaise/100) : FARE;
+    const r = s.cancelRefundPaise != null ? (s.cancelRefundPaise/100) : CANCEL_REFUND;
     if(a) a.textContent=`₹${f}`;
-    if(b) b.textContent=`₹${r}`;
-    if(c) c.textContent=`₹${f}`;
+    if(b) b.textContent = r > 0
+      ? `₹${r} auto-refund to source in 5–7 days.`
+      : "No refund for this service (₹0).";
+    if(c) c.textContent=`Full ₹${f} auto-refunded.`;
   }
 
   function shortDay(s){ return s.kind==="special"?s.serviceName:String(s.day||"").slice(0,3); }
@@ -215,24 +226,85 @@
         signature + captures, THEN allots CONFIRMED / WAITLIST seat) */
   const FARE = Number((CFG.FARE_TOTAL||100));
   const CANCEL_REFUND = Number((CFG.CANCEL_REFUND||70));
-  function openRazorpay(order, svc, name, email, phone, msg){
+
+  function setPayHint(msg){
+    const el=$("payHint"); if(!el) return;
+    if(msg){ el.textContent=msg; el.classList.remove("hidden"); }
+    else { el.textContent=""; el.classList.add("hidden"); }
+  }
+  function inAppBrowserName(){
+    const ua=String(navigator.userAgent||"");
+    if(/WhatsApp/i.test(ua)) return "WhatsApp";
+    if(/Instagram/i.test(ua)) return "Instagram";
+    if(/FBAN|FBAV|FB_IAB/i.test(ua)) return "Facebook";
+    if(/LinkedInApp/i.test(ua)) return "LinkedIn";
+    if(/MicroMessenger/i.test(ua)) return "WeChat";
+    if(/Snapchat/i.test(ua)) return "Snapchat";
+    if(/GSA\//i.test(ua)) return "the Google app";
+    if(/\bwv\b/i.test(ua)) return "an in-app browser";
+    if(/iPhone|iPad|iPod/i.test(ua) && !/Safari|CriOS|FxiOS|EdgiOS/i.test(ua)) return "an in-app browser";
+    return "";
+  }
+  function initPayHint(){
+    const wb=inAppBrowserName();
+    if(wb){
+      setPayHint("⚠ You're opening this in "+wb+" — UPI/payment can fail inside in-app browsers. If it does, open this page in Chrome or Safari and retry.");
+    }else if(/^rzp_test_/i.test(String(CFG.RAZORPAY_KEY_ID||""))){
+      setPayHint("⚠ Razorpay TEST mode is active. Real UPI apps cannot complete payments in test mode — use success@razorpay or a test card.");
+    }
+  }
+  function ensureRazorpay(){
     return new Promise((resolve,reject)=>{
-      if(typeof window.Razorpay==="undefined"){ reject(new Error("Razorpay failed to load. Check connection / ad-blocker and retry.")); return; }
-      const keyId = order.keyId || CFG.RAZORPAY_KEY_ID;
-      if(!keyId || keyId.indexOf("REPLACE")>=0){ reject(new Error("Razorpay key not configured in config.js.")); return; }
+      if(typeof window.Razorpay!=="undefined"){ resolve(); return; }
+      const src="https://checkout.razorpay.com/v1/checkout.js";
+      const s=document.createElement("script");
+      s.src=src; s.async=true;
+      let done=false;
+      const finish=(ok)=>{
+        if(done) return; done=true;
+        if(ok && typeof window.Razorpay!=="undefined") resolve();
+        else reject(new Error("Razorpay Checkout could not load. Disable any ad-blocker / content blocker and retry."));
+      };
+      s.onload=()=>finish(true);
+      s.onerror=()=>finish(false);
+      document.head.appendChild(s);
+      setTimeout(()=>finish(typeof window.Razorpay!=="undefined"),8000);
+    });
+  }
+  async function openRazorpay(order, svc, name, email, phone, msg){
+    await ensureRazorpay();
+    return new Promise((resolve,reject)=>{
+      const keyId = String(order.keyId || CFG.RAZORPAY_KEY_ID || "").trim();
+      if(!keyId || keyId.indexOf("REPLACE")>=0 || keyId.indexOf("__")>=0 || !/^rzp_(test|live)_/.test(keyId)){ reject(new Error("Razorpay key not configured in config.js. Set a real rzp_test_/rzp_live_ key.")); return; }
+      const isTest = /^rzp_test_/i.test(keyId);
+      if(isTest){ setPayHint("⚠ Razorpay TEST mode is active. Real UPI apps cannot complete payments in test mode — use success@razorpay or a test card."); }
+      else if(!inAppBrowserName()){
+        const h=$("payHint");
+        if(h && /TEST mode/i.test(h.textContent||"")) setPayHint("");
+      }
       const tag=(svc.serviceName||svc.day||"")+" "+(svc.serviceDate||"");
+      const contact=String(phone||"").replace(/[^\d]/g,"").slice(-10);
       const rzp=new window.Razorpay({
         key:keyId, amount:order.amount, currency:order.currency||"INR",
         name:"SWC · IISER TVM", description:("Bus seat · "+tag).slice(0,120),
         order_id:order.orderId,
-        prefill:{name,email,contact:phone},
+        prefill:{name,email,contact},
         theme:{color:"#191712"},
+        retry:{enabled:true, max_count:3},
         modal:{ondismiss:()=>reject(new Error("Payment window closed. No money deducted — try again to book."))},
         handler:(resp)=>resolve(resp)
       });
       rzp.on("payment.failed",(r)=>{
-        const d=(r&&r.error&&r.error.description)||"Payment failed.";
-        reject(new Error(d+" If money was deducted it auto-refunds in 5–7 days — contact SWC with payment ID."));
+        const e=(r&&r.error)||{};
+        const code=String(e.code||"");
+        const desc=e.description||"Payment failed.";
+        let hint="";
+        if(code==="payment_cancelled"||/cancel/i.test(desc)) hint="Payment was cancelled — no money was deducted.";
+        else if(/upi/i.test(code)||/upi/i.test(desc)) hint="Your UPI app/bank could not complete it — try another UPI app, a card, or netbanking under Show All Options.";
+        else if(/card|bank/i.test(code)||/card|bank/i.test(desc)) hint="Try another card/bank or switch to UPI.";
+        if(isTest) hint+=" This is TEST mode: use success@razorpay or test card 4111 1111 1111 1111.";
+        const wb=inAppBrowserName(); if(wb) hint+=" Open the site in Chrome/Safari instead of "+wb+".";
+        reject(new Error((desc+" "+hint).trim()+" No booking was created."));
       });
       rzp.open();
     });
@@ -267,13 +339,18 @@
         razorpay_order_id:payResp.razorpay_order_id,razorpay_payment_id:payResp.razorpay_payment_id,razorpay_signature:payResp.razorpay_signature});
       if(!j.ok) throw new Error(j.error+" (Payment "+payResp.razorpay_payment_id+" — contact SWC if deducted.)");
       const tag=svc.serviceName?esc(svc.serviceName)+" · ":"";
-      const paidLine=`<br>Paid: <b>₹${fare}</b> · Payment <b>${esc(j.paymentId||payResp.razorpay_payment_id)}</b>`;
+      const paidFare = (j.amountPaid != null) ? (j.amountPaid/100) : fare;
+      const refundAmt = (j.cancelRefundPaise != null) ? (j.cancelRefundPaise/100) : refund;
+      const refundLine = refundAmt > 0
+        ? `Cancel anytime: ₹${refundAmt} auto-refund (service policy).`
+        : "Cancel anytime: no refund for this service.";
+      const paidLine=`<br>Paid: <b>₹${paidFare}</b> · Payment <b>${esc(j.paymentId||payResp.razorpay_payment_id)}</b>`;
       if(j.status==="CONFIRMED"){
         msg.className="form-msg ok"; msg.textContent="Payment verified! Booked — mail sent to "+email;
-        showModal("Seat booked ✅",`Hi <b>${esc(name)}</b> — ${tag}<b>${esc(svc.serviceDate||"")}</b> confirmed.<br><br>ID: <b>${esc(j.bookingId)}</b>${paidLine}<br>Mail from <b>SWC.IISER.TVM</b> sent to <b>${esc(email)}</b>.<br>Be ready 15 min early with college ID.<br><br><span style="font-size:12px">Cancel anytime: ₹${refund} auto-refund (service policy).</span>`);
+        showModal("Seat booked ✅",`Hi <b>${esc(name)}</b> — ${tag}<b>${esc(svc.serviceDate||"")}</b> confirmed.<br><br>ID: <b>${esc(j.bookingId)}</b>${paidLine}<br>Mail from <b>SWC.IISER.TVM</b> sent to <b>${esc(email)}</b>.<br>Be ready 15 min early with college ID.<br><br><span style="font-size:12px">${refundLine}</span>`);
       }else{
         msg.className="form-msg ok"; msg.textContent=`Payment verified! All ${svc.totalSeats||""} filled — waitlist #${j.waitlistPosition}`;
-        showModal("Waitlist #"+j.waitlistPosition,`Sorry, all seats are filled.<br><br>You are <b>#${esc(j.waitlistPosition)}</b> for ${tag}<b>${esc(svc.serviceDate||"")}</b> (ID <b>${esc(j.bookingId)}</b>).${paidLine}<br>Auto-confirm + mail if someone cancels.<br><b>Never promoted by departure? Full ₹${fare} auto-refunded.</b>`);
+        showModal("Waitlist #"+j.waitlistPosition,`Sorry, all seats are filled.<br><br>You are <b>#${esc(j.waitlistPosition)}</b> for ${tag}<b>${esc(svc.serviceDate||"")}</b> (ID <b>${esc(j.bookingId)}</b>).${paidLine}<br>Auto-confirm + mail if someone cancels.<br><b>Never promoted by departure? Full ₹${paidFare} auto-refunded.</b>`);
       }
       loadServices(); loadMy();
     }catch(err){
@@ -303,23 +380,29 @@
       const paid=b.amountPaid?` · ₹${(b.amountPaid/100)} paid`:"";
       const rf=b.refundAmount?` · ₹${(b.refundAmount/100)} refunded`:"";
       const payExtra=(b.paymentId||b.refundStatus)?`<br><span class="id">${b.paymentId?"pay "+esc(b.paymentId):""}${rf}${b.refundStatus?" · "+esc(b.refundStatus):""}</span>`:"";
+      const rc=(b.cancelRefundPaise!=null)?(b.cancelRefundPaise/100):CANCEL_REFUND;
+      const cancelLabel=rc>0?`Cancel (₹${rc} refund)`:"Cancel booking";
       return `<div class="ticket-row">
       <div><strong>${esc(nm)} · ${esc(dep)}</strong><br><span class="id">${esc(b.bookingId)}${b.seatNo?" · seat "+esc(b.seatNo):""}${b.waitlistPosition?" · WL #"+esc(b.waitlistPosition):""}${paid}</span>${payExtra}</div>
-      <div style="display:flex;gap:8px;align-items:center"><span class="pill ${b.status}">${b.status}</span>
-      ${(b.status==="CONFIRMED"||b.status==="WAITLIST")?`<button class="cancel" onclick="window._cancel('${b.bookingId}')">Cancel (₹${CANCEL_REFUND} refund)</button>`:""}</div>
+      <div style="display:flex;gap:8px;align-items:center"><span class="pill ${esc(b.status)}">${esc(b.status)}</span>
+      ${(b.status==="CONFIRMED"||b.status==="WAITLIST")?`<button class="cancel" onclick="window._cancel('${b.bookingId}')">${cancelLabel}</button>`:""}</div>
     </div>`;}).join("");
   }
   window._cancel=async(id)=>{
     if(!user||!user.email||!user.idToken){ toast("Please sign in first.","err"); return; }
     const email=user.email.toLowerCase();
     const _b = (myBookingsCache||[]).find(x=>x.bookingId===id);
-   const _r = _b && _b.cancelRefundPaise != null ? (_b.cancelRefundPaise/100) : CANCEL_REFUND;
-   if(!confirm(`Cancel ${id}?\n\nSeat goes to the waitlist.\n₹${_r} auto-refunded to source in 5–7 days (service policy).`)) return;
+    const _r = _b && _b.cancelRefundPaise != null ? (_b.cancelRefundPaise/100) : CANCEL_REFUND;
+    const refundNote = _r > 0
+      ? `₹${_r} auto-refunded to source in 5–7 days.`
+      : "No refund will be issued for this service (₹0).";
+    if(!confirm(`Cancel ${id}?\n\nSeat goes to the waitlist.\n${refundNote}`)) return;
     try{
-      toast("Cancelling + processing ₹"+CANCEL_REFUND+" refund…","");
+      toast(_r > 0 ? `Cancelling + processing ₹${_r} refund…` : "Cancelling booking…","");
       const j=await apiPost({action:"cancel",bookingId:id,email,idToken:user.idToken});
       if(!j.ok) throw new Error(j.error);
-      toast(j.message,"ok"); showModal("Cancelled + refund",esc(j.message)+"<br><br>Mail sent by <b>SWC.IISER.TVM</b>.");
+      const title=(j.refund && j.refund.amount>0)?"Cancelled + refund initiated":"Booking cancelled";
+      toast(j.message,"ok"); showModal(title,esc(j.message)+"<br><br>Mail sent by <b>SWC.IISER.TVM</b>.");
     }catch(e){ toast(e.message,"err"); }
     loadServices(); loadMy();
   };
@@ -331,6 +414,7 @@
     syncFareBox(s);
   });
 
+  initPayHint();
   initAuth(); loadServices();
   if(user&&user.email) loadMy();
 })();

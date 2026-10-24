@@ -5,9 +5,11 @@
 // Local dev: replace __RAZORPAY_KEY_ID__ with your rzp_test_... key.
 
 window.SWC_CONFIG = {
-  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbwuHg1Ix1bBv-qQHv7P9_IDZ6LvhMiMBLI2-59AM2ICQKmB9x-WkwmjtBWeoCZsZMW-/exec",
+  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbxQNqkYf_IH1tETGFSDZNSOR816qA5XnLS_ro70FE1ha0Y8Ds9A-B-vl7645mjOkr63/exec",
   GOOGLE_CLIENT_ID: "71909220285-647djv3jpier18p19htkd5ia6obp192n.apps.googleusercontent.com",
   RAZORPAY_KEY_ID: "__RAZORPAY_KEY_ID__", // public key only — RAZORPAY_KEY_SECRET never goes in frontend
+  // Use rzp_live_... for real payments. rzp_test_... only accepts Razorpay test
+  // instruments (success@razorpay / test cards); real UPI apps will fail.
   FARE_TOTAL: 100,
   CANCEL_REFUND: 70,
   CURRENCY: "INR",
