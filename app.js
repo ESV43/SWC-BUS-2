@@ -94,12 +94,18 @@
         :(`All ${s.totalSeats} filled`+(s.waitlistCount?` · ${s.waitlistCount} waiting`:" — join waitlist"));
       const can=s.bookingOpen;
       const btn=s.disabled?"NOT OPERATING":s.window==="upcoming"?"OPENS "+esc(s.opensAt):s.window==="closed"?"BOOKING CLOSED":s.available>0?"BOOK THIS BUS":"JOIN WAITLIST";
+      // Per-service cancel refund (from the sheet for specials, fixed for weekends).
+      const rc=(s.cancelRefundPaise!=null)?(s.cancelRefundPaise/100):CANCEL_REFUND;
+      const cancelLine=rc>0?`₹${rc} auto-refund in 5–7 days`:"No refund on cancel";
+      const fare = s.farePaise ? (s.farePaise/100) : FARE;
       return `<div class="bus ${s.disabled?"off":""} ${s.available<=0&&!s.disabled?"full":""}">
         <div class="bus-top"><div><div class="bus-day">${title}</div></div>${stamp(s)}</div>
         <div class="bus-lines">
+          <div><span>FARE:</span> <strong>₹${fare}</strong></div>
           <div><span>BUS TIME:</span> <strong>${busTime}</strong></div>
           <div><span>ROUTE:</span> <strong>${routeLine}</strong></div>
           <div><span>BOOKING TIME:</span> <strong>${bookingLine}</strong></div>
+          <div><span>CANCEL:</span> <strong>${cancelLine}</strong></div>
         </div>
         <div class="seat-big">${s.disabled?"–":s.available}<small> / ${s.totalSeats} left</small></div>
         <div class="meter"><i style="width:${s.disabled?0:pct}%"></i></div>
@@ -114,19 +120,14 @@
    }
   window._prefill=(sid)=>{ $("fService").value=sid; const s=services.find(x=>x.serviceId===sid); syncFareBox(s); const f=s&&s.farePaise?(s.farePaise/100):FARE; $("bookBtn").textContent=`PAY ₹${f} & BOOK →`; $("bookForm").scrollIntoView({behavior:"smooth",block:"center"}); };
   function syncFareBox(s){
-    const a=$("fareAmt"), b=$("refundAmt"), c=$("waitRefundAmt");
+    const b=$("refundAmt"), c=$("waitRefundAmt");
     if(!s){
-      if(a) a.textContent="₹—";
-      if(b) b.textContent="Refund policy loads with the bus.";
+      if(b) b.textContent="auto-refund to source in 5–7 days — see the trip card for the amount.";
       if(c) c.textContent="Full fare auto-refunded.";
       return;
     }
     const f = s.farePaise ? (s.farePaise/100) : FARE;
-    const r = s.cancelRefundPaise != null ? (s.cancelRefundPaise/100) : CANCEL_REFUND;
-    if(a) a.textContent=`₹${f}`;
-    if(b) b.textContent = r > 0
-      ? `₹${r} auto-refund to source in 5–7 days.`
-      : "No refund for this service (₹0).";
+    if(b) b.textContent="auto-refund to source in 5–7 days — see the trip card for the amount.";
     if(c) c.textContent=`Full ₹${f} auto-refunded.`;
   }
 
